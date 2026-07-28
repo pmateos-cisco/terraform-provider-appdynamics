@@ -1,0 +1,6 @@
+terraform-provider-appdynamics
+terraform-provider-appdynamics.exe
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
