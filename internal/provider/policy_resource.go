@@ -153,6 +153,13 @@ func (r *policyResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	state := modelFromAPIPolicy(plan.ApplicationID.ValueInt64(), created)
+	// actions_json/events_json/selected_entities_json are Required (not Computed):
+	// the API echoes these back with extra server-defaulted fields the plan never
+	// specified, so state must keep the plan's own value or Terraform flags an
+	// inconsistent result.
+	state.ActionsJSON = plan.ActionsJSON
+	state.EventsJSON = plan.EventsJSON
+	state.SelectedEntitiesJSON = plan.SelectedEntitiesJSON
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -180,6 +187,12 @@ func (r *policyResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	newState := modelFromAPIPolicy(state.ApplicationID.ValueInt64(), found)
+	// See the comment in Create: the API response can never exactly match what a
+	// user wrote in config, so keep the prior state's value here instead of the
+	// freshly-fetched one to avoid a perpetual, spurious diff on every plan.
+	newState.ActionsJSON = state.ActionsJSON
+	newState.EventsJSON = state.EventsJSON
+	newState.SelectedEntitiesJSON = state.SelectedEntitiesJSON
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
@@ -205,6 +218,9 @@ func (r *policyResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	newState := modelFromAPIPolicy(plan.ApplicationID.ValueInt64(), updated)
+	newState.ActionsJSON = plan.ActionsJSON
+	newState.EventsJSON = plan.EventsJSON
+	newState.SelectedEntitiesJSON = plan.SelectedEntitiesJSON
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 

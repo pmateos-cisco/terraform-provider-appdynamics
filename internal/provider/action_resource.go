@@ -121,6 +121,10 @@ func (r *actionResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	state := modelFromAPIAction(plan.ApplicationID.ValueInt64(), created)
+	// extra_fields is not Computed: if the API ever echoes it back with extra
+	// server-defaulted fields the plan never specified, state must keep the
+	// plan's own value or Terraform flags an inconsistent result.
+	state.ExtraFields = plan.ExtraFields
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -148,6 +152,9 @@ func (r *actionResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	newState := modelFromAPIAction(state.ApplicationID.ValueInt64(), found)
+	// See the comment in Create: keep the prior state's value instead of the
+	// freshly-fetched one to avoid a perpetual, spurious diff on every plan.
+	newState.ExtraFields = state.ExtraFields
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
@@ -173,6 +180,7 @@ func (r *actionResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	newState := modelFromAPIAction(plan.ApplicationID.ValueInt64(), updated)
+	newState.ExtraFields = plan.ExtraFields
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 

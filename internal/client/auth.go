@@ -40,7 +40,6 @@ func (c *Client) token(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("building token request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

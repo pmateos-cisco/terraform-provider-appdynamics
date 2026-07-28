@@ -85,7 +85,7 @@ func (r *healthRuleResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"affects_json": schema.StringAttribute{
 				CustomType:  jsontypes.NormalizedType{},
 				Required:    true,
-				Description: "JSON object for the Affects block, e.g. {\"affectedEntityType\":\"TIER_NODE_HARDWARE\",\"affectedTiers\":{\"tierNames\":[\"Tier1\"]}}. See the Splunk AppDynamics Health Rule API docs for the shape per affectedEntityType.",
+				Description: "JSON object for the Affects block, e.g. {\"affectedEntityType\":\"TIER_NODE_HARDWARE\",\"affectedEntities\":{\"tierOrNode\":\"TIER_AFFECTED_ENTITIES\",\"affectedTiers\":{\"affectedTierScope\":\"SPECIFIC_TIERS\",\"tiers\":[\"Tier1\"],\"shouldNot\":false}}}. See the Splunk AppDynamics Health Rule API docs for the shape per affectedEntityType.",
 			},
 			"eval_criterias_json": schema.StringAttribute{
 				CustomType:  jsontypes.NormalizedType{},
@@ -162,6 +162,11 @@ func (r *healthRuleResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	state := modelFromAPIHealthRule(plan.ApplicationID.ValueInt64(), created)
+	// affects_json/eval_criterias_json are Required (not Computed): the API echoes
+	// these back with extra server-defaulted fields the plan never specified, so
+	// state must keep the plan's own value or Terraform flags an inconsistent result.
+	state.AffectsJSON = plan.AffectsJSON
+	state.EvalCriteriasJSON = plan.EvalCriteriasJSON
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -189,6 +194,13 @@ func (r *healthRuleResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	newState := modelFromAPIHealthRule(state.ApplicationID.ValueInt64(), found)
+	// The API echoes affects/evalCriterias back with extra server-defaulted fields
+	// that will never match what a user wrote in config, so a literal diff against
+	// the API response would show a perpetual, spurious update on every plan. Keep
+	// the prior state's value instead; drift here would already have surfaced as a
+	// remote error when it mattered (e.g. on the next apply).
+	newState.AffectsJSON = state.AffectsJSON
+	newState.EvalCriteriasJSON = state.EvalCriteriasJSON
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 
@@ -214,6 +226,8 @@ func (r *healthRuleResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	newState := modelFromAPIHealthRule(plan.ApplicationID.ValueInt64(), updated)
+	newState.AffectsJSON = plan.AffectsJSON
+	newState.EvalCriteriasJSON = plan.EvalCriteriasJSON
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
 

@@ -4,3 +4,4 @@ terraform-provider-appdynamics.exe
 *.tfstate.backup
 .terraform/
 .terraform.lock.hcl
+examples/provider/provider.tf

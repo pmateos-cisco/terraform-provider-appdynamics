@@ -114,10 +114,14 @@ func (p *appdynamicsProvider) Resources(ctx context.Context) []func() resource.R
 		NewScheduleResource,
 		NewActionResource,
 		NewHealthRuleResource,
+		NewHealthRulesEnableAllResource,
 		NewPolicyResource,
 	}
 }
 
 func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return nil
+	return []func() datasource.DataSource{
+		NewHealthRulesDataSource,
+		NewHealthRuleDataSource,
+	}
 }

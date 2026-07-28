@@ -46,6 +46,36 @@ func (c *Client) GetHealthRule(ctx context.Context, applicationID, healthRuleID 
 	return &out, nil
 }
 
+// HealthRuleSummary is the abbreviated representation returned by the
+// health-rules list endpoint (id, name, enabled, affectedEntityType only —
+// use GetHealthRule for a specific rule's full affects/evalCriterias detail).
+type HealthRuleSummary struct {
+	ID                 int64  `json:"id"`
+	Name               string `json:"name"`
+	Enabled            bool   `json:"enabled"`
+	AffectedEntityType string `json:"affectedEntityType"`
+}
+
+func (c *Client) ListHealthRules(ctx context.Context, applicationID int64) ([]HealthRuleSummary, error) {
+	var out []HealthRuleSummary
+	if err := c.do(ctx, http.MethodGet, healthRulesPath(applicationID), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// EnableAllHealthRules enables every health rule defined for applicationID in
+// a single call.
+func (c *Client) EnableAllHealthRules(ctx context.Context, applicationID int64) error {
+	return c.do(ctx, http.MethodPut, healthRulesPath(applicationID)+"/enable", nil, nil)
+}
+
+// DisableAllHealthRules disables every health rule defined for applicationID
+// in a single call.
+func (c *Client) DisableAllHealthRules(ctx context.Context, applicationID int64) error {
+	return c.do(ctx, http.MethodPut, healthRulesPath(applicationID)+"/disable", nil, nil)
+}
+
 func (c *Client) UpdateHealthRule(ctx context.Context, applicationID, healthRuleID int64, hr *HealthRule) (*HealthRule, error) {
 	var out HealthRule
 	if err := c.do(ctx, http.MethodPut, healthRulePath(applicationID, healthRuleID), hr, &out); err != nil {

@@ -1,13 +1,29 @@
 # terraform-provider-appdynamics
 
-A Terraform provider for Splunk AppDynamics, covering the "Alert and Respond" Platform APIs:
+A Terraform provider for Splunk AppDynamics, covering the "Alert and Respond" Platform APIs.
+
+Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
+
+## Resources
 
 - `appdynamics_schedule` — alerting schedules
 - `appdynamics_action` — alert actions (email, thread dump, HTTP request, JIRA, etc.)
-- `appdynamics_health_rule` — health rules
+- `appdynamics_health_rule` — health rules (create/read/update/delete a single rule)
+- `appdynamics_health_rules_enable_all` — bulk-enables every health rule for an application on
+  create, bulk-disables them on destroy. Models a one-shot action rather than a tracked object:
+  `Read`/`Update` are no-ops, and `application_id` forces replacement on change, so re-running the
+  enable call requires tainting/replacing the resource rather than a routine `apply`. See
+  `examples/resources/appdynamics_health_rules_enable_all`.
 - `appdynamics_policy` — policies binding events to actions
 
-Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
+## Data Sources
+
+- `appdynamics_health_rules` — lists health rules for an application (`id`, `name`, `enabled`,
+  `affected_entity_type` only; use the singular data source below for full detail on one rule).
+- `appdynamics_health_rule` — retrieves the full detail (including `affects_json` /
+  `eval_criterias_json`) of one health rule by `application_id` + `health_rule_id`. Shares its type
+  name with the managed resource above — `resource "appdynamics_health_rule"` and
+  `data "appdynamics_health_rule"` are separate namespaces, so this is expected, not a conflict.
 
 ## Design note: JSON passthrough for nested config
 
@@ -21,6 +37,29 @@ same functionality), those blocks are exposed as `jsonencode()`'d JSON string at
 JSON shapes, and the [Splunk AppDynamics Platform API docs](https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/25.7.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index)
 for the full reference. These attributes use `jsontypes.Normalized`, so formatting differences
 (key order, whitespace) don't cause spurious diffs.
+
+Note that the Controller API echoes these blocks back with extra server-defaulted fields that were
+never in the request (e.g. `evaluateToTrueOnNoData`, `violationStatusOnNoData`, `warningCriteria`).
+Since `affects_json`/`eval_criterias_json`/`events_json`/`selected_entities_json` are `Required`
+(not `Computed`), `Create`/`Update`/`Read` keep the plan's or prior state's own value for these
+attributes rather than the API's expanded response — otherwise Terraform either flags an
+"inconsistent result after apply" error or shows a perpetual spurious diff on every `plan`.
+
+## API Response Codes
+
+Response codes returned by the underlying AppDynamics Controller REST API (surfaced to Terraform
+as the `status <code>` in `appdynamics api error: status <code>: <body>`):
+
+| Code | Description |
+| ---- | ----------- |
+| 200 | Fetched successfully |
+| 201 | Created successfully |
+| 204 | Deleted successfully |
+| 400 | Bad request |
+| 401 | Unauthorized |
+| 403 | Forbidden |
+| 404 | Resource not found |
+| 409 | Already exists |
 
 ## Building
 

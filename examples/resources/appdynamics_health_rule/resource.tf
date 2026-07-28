@@ -1,13 +1,20 @@
 resource "appdynamics_health_rule" "high_cpu" {
-  application_id = 42
-  name           = "High CPU Usage"
-  enabled        = true
-  schedule_name  = appdynamics_schedule.business_hours.name
+  application_id                = 42
+  name                          = "High CPU Usage"
+  enabled                       = true
+  schedule_name                 = appdynamics_schedule.business_hours.name
+  use_data_from_last_n_minutes  = 15
+  wait_time_after_violation     = 5
 
   affects_json = jsonencode({
     affectedEntityType = "TIER_NODE_HARDWARE"
-    affectedTiers = {
-      tierNames = ["Tier1"]
+    affectedEntities = {
+      tierOrNode = "TIER_AFFECTED_ENTITIES"
+      affectedTiers = {
+        affectedTierScope = "SPECIFIC_TIERS"
+        tiers             = ["Tier1"]
+        shouldNot         = false
+      }
     }
   })
 
@@ -16,7 +23,8 @@ resource "appdynamics_health_rule" "high_cpu" {
       conditionAggregationType = "ALL"
       conditions = [
         {
-          name = "A"
+          name      = "A"
+          shortName = "A"
           evalDetail = {
             evalDetailType         = "SINGLE_METRIC"
             metricPath              = "Hardware Resources|CPU|%Busy"
