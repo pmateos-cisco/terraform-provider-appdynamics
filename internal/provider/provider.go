@@ -127,5 +127,6 @@ func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasour
 	return []func() datasource.DataSource{
 		NewHealthRulesDataSource,
 		NewHealthRuleDataSource,
+		NewActionsDataSource,
 	}
 }

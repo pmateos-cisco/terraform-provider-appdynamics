@@ -24,6 +24,15 @@ Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
   `eval_criterias_json`) of one health rule by `application_id` + `health_rule_id`. Shares its type
   name with the managed resource above — `resource "appdynamics_health_rule"` and
   `data "appdynamics_health_rule"` are separate namespaces, so this is expected, not a conflict.
+- `appdynamics_actions` — lists actions for an application (`id`, `name`, `action_type` only).
+
+## Known API documentation gap: action item paths
+
+The Actions API docs describe `GET`/single-item retrieval at `/actions/{action-id}` (plural) but
+`PUT`/`DELETE` at `/action/{action-id}` (singular). Verified live against a real controller: **all
+three (GET, PUT, DELETE) actually require the plural `/actions/{action-id}` form** — the singular
+form 404s across the board. `internal/client/action.go`'s `actionItemPath` uses the plural form for
+all three operations, contradicting the docs' claim for PUT/DELETE but matching observed behavior.
 
 ## Design note: JSON passthrough for nested config
 

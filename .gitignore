@@ -7,3 +7,5 @@ terraform-provider-appdynamics.exe
 examples/provider/provider.tf
 # Personal local test harness, not part of the published provider
 /main.tf
+PROJECT_HISTORY.pptx
+PROJECT_HISTORY_2026-07-29_0939.md

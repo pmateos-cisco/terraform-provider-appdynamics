@@ -76,9 +76,13 @@ func actionsPath(applicationID int64) string {
 	return fmt.Sprintf("/controller/alerting/rest/v1/applications/%d/actions", applicationID)
 }
 
-// actionItemPath uses the API's singular "/action/{id}" form for get/update/delete.
+// actionItemPath uses the plural "/actions/{id}" form for get/update/delete.
+// The API docs claim PUT/DELETE use a singular "/action/{id}" form, but that's
+// wrong in practice — verified live against a real controller (GET, PUT, and
+// DELETE with the singular form all return 404; the plural form used here
+// works for all three).
 func actionItemPath(applicationID, actionID int64) string {
-	return fmt.Sprintf("/controller/alerting/rest/v1/applications/%d/action/%d", applicationID, actionID)
+	return fmt.Sprintf("%s/%d", actionsPath(applicationID), actionID)
 }
 
 func (c *Client) CreateAction(ctx context.Context, applicationID int64, a *Action) (*Action, error) {
@@ -107,4 +111,21 @@ func (c *Client) UpdateAction(ctx context.Context, applicationID, actionID int64
 
 func (c *Client) DeleteAction(ctx context.Context, applicationID, actionID int64) error {
 	return c.do(ctx, http.MethodDelete, actionItemPath(applicationID, actionID), nil, nil)
+}
+
+// ActionSummary is the abbreviated representation returned by the actions
+// list endpoint (id, name, actionType only — use GetAction for a specific
+// action's full type-specific detail).
+type ActionSummary struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	ActionType string `json:"actionType"`
+}
+
+func (c *Client) ListActions(ctx context.Context, applicationID int64) ([]ActionSummary, error) {
+	var out []ActionSummary
+	if err := c.do(ctx, http.MethodGet, actionsPath(applicationID), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
