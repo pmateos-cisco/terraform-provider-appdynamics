@@ -4,7 +4,6 @@ terraform-provider-appdynamics.exe
 *.tfstate.backup
 .terraform/
 .terraform.lock.hcl
-examples/provider/provider.tf
 # Personal local test harness, not part of the published provider
 /main.tf
 PROJECT_HISTORY.pptx
