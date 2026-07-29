@@ -120,6 +120,7 @@ func (p *appdynamicsProvider) Resources(ctx context.Context) []func() resource.R
 		NewHealthRuleResource,
 		NewHealthRulesEnableAllResource,
 		NewPolicyResource,
+		NewActionSuppressionResource,
 	}
 }
 
@@ -128,5 +129,7 @@ func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasour
 		NewHealthRulesDataSource,
 		NewHealthRuleDataSource,
 		NewActionsDataSource,
+		NewActionSuppressionsDataSource,
+		NewActionSuppressionDataSource,
 	}
 }

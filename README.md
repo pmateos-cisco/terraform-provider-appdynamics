@@ -15,6 +15,10 @@ Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
   enable call requires tainting/replacing the resource rather than a routine `apply`. See
   `examples/resources/appdynamics_health_rules_enable_all`.
 - `appdynamics_policy` — policies binding events to actions
+- `appdynamics_action_suppression` — schedules during which actions are muted for a scope of
+  entities (a maintenance window). `suppression_schedule_type` is `ONE_TIME` (uses `start_time`/
+  `end_time`) or `RECURRING` (uses `recurring_schedule_json`, same `scheduleFrequency` shapes as
+  `appdynamics_schedule`'s `schedule_configuration`).
 
 ## Data Sources
 
@@ -25,14 +29,30 @@ Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
   name with the managed resource above — `resource "appdynamics_health_rule"` and
   `data "appdynamics_health_rule"` are separate namespaces, so this is expected, not a conflict.
 - `appdynamics_actions` — lists actions for an application (`id`, `name`, `action_type` only).
+- `appdynamics_action_suppressions` — lists action suppressions for an application (`id`, `name`,
+  `timezone`, `start_time`, `end_time` only).
+- `appdynamics_action_suppression` — retrieves full detail of one action suppression, looked up by
+  **either** `action_suppression_id` or `name` (exactly one must be set) — the only data source in
+  this provider backed by two different lookup endpoints.
 
-## Known API documentation gap: action item paths
+## Known API documentation gaps
+
+### Action item paths
 
 The Actions API docs describe `GET`/single-item retrieval at `/actions/{action-id}` (plural) but
 `PUT`/`DELETE` at `/action/{action-id}` (singular). Verified live against a real controller: **all
 three (GET, PUT, DELETE) actually require the plural `/actions/{action-id}` form** — the singular
 form 404s across the board. `internal/client/action.go`'s `actionItemPath` uses the plural form for
 all three operations, contradicting the docs' claim for PUT/DELETE but matching observed behavior.
+
+### Action suppression field names
+
+The Action Suppression API docs mention `healthRuleScope.healthRuleScopeType` but never give the
+field name for the actual list of health rule names. Verified live: the real field is
+**`healthRules`**, not `healthRuleNames`. A `RECURRING` suppression's `recurringSchedule` block
+also isn't documented at all beyond the type name — verified live that it reuses the same
+`scheduleFrequency`-discriminated shape as `appdynamics_schedule`'s `schedule_configuration`
+(`scheduleFrequency: "WEEKLY"`, `days`, `startTime`, `endTime`, etc.).
 
 ## Design note: JSON passthrough for nested config
 
@@ -48,10 +68,11 @@ for the full reference. These attributes use `jsontypes.Normalized`, so formatti
 (key order, whitespace) don't cause spurious diffs.
 
 Note that the Controller API echoes these blocks back with extra server-defaulted fields that were
-never in the request (e.g. `evaluateToTrueOnNoData`, `violationStatusOnNoData`, `warningCriteria`).
-Since `affects_json`/`eval_criterias_json`/`events_json`/`selected_entities_json` are `Required`
-(not `Computed`), `Create`/`Update`/`Read` keep the plan's or prior state's own value for these
-attributes rather than the API's expanded response — otherwise Terraform either flags an
+never in the request (e.g. `evaluateToTrueOnNoData`, `violationStatusOnNoData`, `warningCriteria`,
+`suppressionMaintenanceType`). Since `affects_json`/`eval_criterias_json`/`events_json`/
+`selected_entities_json`/`recurring_schedule_json`/`health_rule_scope_json` are `Required` or
+`Optional` (not `Computed`), `Create`/`Update`/`Read` keep the plan's or prior state's own value for
+these attributes rather than the API's expanded response — otherwise Terraform either flags an
 "inconsistent result after apply" error or shows a perpetual spurious diff on every `plan`.
 
 ## API Response Codes
