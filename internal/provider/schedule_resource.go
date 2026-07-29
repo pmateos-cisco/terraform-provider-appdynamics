@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/pmateos/terraform-provider-appdynamics/internal/client"
+	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client"
 )
 
 var (

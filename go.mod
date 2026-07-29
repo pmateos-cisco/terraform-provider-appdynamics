@@ -1,4 +1,4 @@
-module github.com/pmateos/terraform-provider-appdynamics
+module github.com/pmateos-cisco/terraform-provider-appdynamics
 
 go 1.25.8
 

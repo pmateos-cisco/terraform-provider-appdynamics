@@ -13,18 +13,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/pmateos/terraform-provider-appdynamics/internal/client"
+	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client"
 )
 
 // New returns a factory for the AppDynamics provider, suitable for passing to
-// providerserver.Serve.
-func New() func() provider.Provider {
+// providerserver.Serve. version is injected at build time via -ldflags and
+// surfaced through the provider's Metadata response.
+func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &appdynamicsProvider{}
+		return &appdynamicsProvider{version: version}
 	}
 }
 
-type appdynamicsProvider struct{}
+type appdynamicsProvider struct {
+	version string
+}
 
 type providerModel struct {
 	ControllerURL types.String `tfsdk:"controller_url"`
@@ -34,6 +37,7 @@ type providerModel struct {
 
 func (p *appdynamicsProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "appdynamics"
+	resp.Version = p.version
 }
 
 func (p *appdynamicsProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {

@@ -89,7 +89,7 @@ commands directly, e.g. `go build -o terraform-provider-appdynamics.exe .` and `
    ```hcl
    provider_installation {
      dev_overrides {
-       "pmateos/appdynamics" = "C:\\Users\\<you>\\go\\bin"
+       "pmateos-cisco/appdynamics" = "C:\\Users\\<you>\\go\\bin"
      }
      direct {}
    }
