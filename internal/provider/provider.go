@@ -131,5 +131,7 @@ func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasour
 		NewActionsDataSource,
 		NewActionSuppressionsDataSource,
 		NewActionSuppressionDataSource,
+		NewPoliciesDataSource,
+		NewPolicyDataSource,
 	}
 }

@@ -34,6 +34,12 @@ Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
 - `appdynamics_action_suppression` — retrieves full detail of one action suppression, looked up by
   **either** `action_suppression_id` or `name` (exactly one must be set) — the only data source in
   this provider backed by two different lookup endpoints.
+- `appdynamics_policies` — lists policies for an application (`id`, `name`, `enabled` only; the
+  list endpoint actually returns richer detail per policy, but only these three fields are surfaced
+  for consistency with this provider's other list data sources).
+- `appdynamics_policy` — retrieves the full detail (including `actions_json` / `events_json` /
+  `selected_entities_json`) of one policy by `application_id` + `policy_id`. Shares its type name
+  with the managed resource, same as `appdynamics_health_rule`.
 
 ## Known API documentation gaps
 
