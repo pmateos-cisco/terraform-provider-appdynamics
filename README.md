@@ -44,6 +44,11 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
   so every attribute forces replacement on change, `Read` never contacts the API (nothing reliable
   to read back), and `terraform destroy` only removes the resource from Terraform state — with a
   warning — since the event itself can't be deleted from AppDynamics.
+- `appdynamics_email_digest` — a periodic rollup email binding trigger events on a set of entities
+  to a set of actions, same shape as `appdynamics_policy` (`actions_json`/`events_json`/
+  `selected_entities_json`) plus `frequency` (hours, 1-168). Unlike `appdynamics_policy`, there is
+  **no `execute_actions_in_batch`** — the API rejects that field as invalid for email digests
+  (verified live), even though the official docs' own example payload includes it.
 
 ## Data Sources
 
@@ -74,6 +79,12 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
 - `appdynamics_schedule` — retrieves the full detail (including `schedule_configuration`) of one
   schedule by `application_id` + `schedule_id`. Shares its type name with the managed resource,
   same as `appdynamics_health_rule`.
+- `appdynamics_email_digests` — lists email digests for an application (`id`, `name`, `enabled`
+  only).
+- `appdynamics_email_digest` — retrieves the full detail (including `actions_json` / `events_json`
+  / `selected_entities_json` / `frequency`) of one email digest by `application_id` +
+  `email_digest_id`. Shares its type name with the managed resource, same as
+  `appdynamics_health_rule`.
 
 ## Known API documentation gaps
 
@@ -108,6 +119,15 @@ visible through the query endpoint — in testing, a freshly created event was b
 `appdynamics_events` (empty result) before showing up correctly on a later query. This isn't a bug
 in this provider; treat `appdynamics_events`/`appdynamics_health_rule_violations` results as
 eventually consistent, not immediate.
+
+### Email Digest API GET-list path and executeActionsInBatch
+
+The docs show the list endpoint at `/controller/alerting/rest/v1/applications/<application_id>/`
+(no `email-digests` segment) — that's a documentation typo; the real path is
+`/applications/<application_id>/email-digests`, verified live. Separately, the docs' own example
+create payload includes `"executeActionsInBatch": true`, but the API rejects it outright
+(`400: Execute actions in batch is not allowed for email digests`) — unlike `appdynamics_policy`,
+`appdynamics_email_digest` has no `execute_actions_in_batch` attribute at all.
 
 ## Design note: JSON passthrough for nested config
 

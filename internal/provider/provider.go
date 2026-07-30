@@ -124,6 +124,7 @@ func (p *appdynamicsProvider) Resources(ctx context.Context) []func() resource.R
 		alertandrespond.NewActionSuppressionResource,
 		alertandrespond.NewCustomEventResource,
 		alertandrespond.NewDeploymentEventResource,
+		alertandrespond.NewEmailDigestResource,
 	}
 }
 
@@ -140,5 +141,7 @@ func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasour
 		alertandrespond.NewHealthRuleViolationsDataSource,
 		alertandrespond.NewSchedulesDataSource,
 		alertandrespond.NewScheduleDataSource,
+		alertandrespond.NewEmailDigestsDataSource,
+		alertandrespond.NewEmailDigestDataSource,
 	}
 }
