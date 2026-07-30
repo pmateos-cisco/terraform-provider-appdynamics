@@ -1,4 +1,4 @@
-package provider
+package alertandrespond
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client"
+	client "github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client/alertandrespond"
 )
 
 // stringListToGo converts a (possibly null/unknown) Terraform list of strings

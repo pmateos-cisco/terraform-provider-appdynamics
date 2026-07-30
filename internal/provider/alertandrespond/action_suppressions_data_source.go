@@ -1,4 +1,4 @@
-package provider
+package alertandrespond
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client"
+	client "github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client/alertandrespond"
 )
 
 var (

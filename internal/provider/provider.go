@@ -13,7 +13,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client"
+	client "github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client/alertandrespond"
+	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/provider/alertandrespond"
 )
 
 // New returns a factory for the AppDynamics provider, suitable for passing to
@@ -115,23 +116,23 @@ func (p *appdynamicsProvider) Configure(ctx context.Context, req provider.Config
 
 func (p *appdynamicsProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewScheduleResource,
-		NewActionResource,
-		NewHealthRuleResource,
-		NewHealthRulesEnableAllResource,
-		NewPolicyResource,
-		NewActionSuppressionResource,
+		alertandrespond.NewScheduleResource,
+		alertandrespond.NewActionResource,
+		alertandrespond.NewHealthRuleResource,
+		alertandrespond.NewHealthRulesEnableAllResource,
+		alertandrespond.NewPolicyResource,
+		alertandrespond.NewActionSuppressionResource,
 	}
 }
 
 func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewHealthRulesDataSource,
-		NewHealthRuleDataSource,
-		NewActionsDataSource,
-		NewActionSuppressionsDataSource,
-		NewActionSuppressionDataSource,
-		NewPoliciesDataSource,
-		NewPolicyDataSource,
+		alertandrespond.NewHealthRulesDataSource,
+		alertandrespond.NewHealthRuleDataSource,
+		alertandrespond.NewActionsDataSource,
+		alertandrespond.NewActionSuppressionsDataSource,
+		alertandrespond.NewActionSuppressionDataSource,
+		alertandrespond.NewPoliciesDataSource,
+		alertandrespond.NewPolicyDataSource,
 	}
 }

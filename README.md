@@ -4,6 +4,25 @@ A Terraform provider for Splunk AppDynamics, covering the "Alert and Respond" Pl
 
 Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
 
+## Project structure
+
+Go source is grouped by AppDynamics API family under a subpackage named for that family:
+
+- `internal/client/alertandrespond/` — REST client for the [Alert and Respond
+  API](https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.7.0/extend-splunk-appdynamics/splunk-appdynamics-apis/alert-and-respond-api)
+  (schedules, actions, health rules, policies, action suppressions).
+- `internal/provider/alertandrespond/` — the Terraform resources/data sources backed by that
+  client.
+- `internal/provider/provider.go` stays at the top level — it's the single `provider.Provider`
+  implementation, and just registers every API family's resources/data sources into one provider.
+
+As more AppDynamics API families get added, each gets its own sibling subpackage (e.g.
+`internal/client/<family>/`, `internal/provider/<family>/`) rather than growing the existing ones.
+
+Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sources/<type>/`,
+`docs/resources/*.md`, `docs/data-sources/*.md` — stay flat regardless of API family, since
+`tfplugindocs` and the Registry expect that exact layout.
+
 ## Resources
 
 - `appdynamics_schedule` — alerting schedules

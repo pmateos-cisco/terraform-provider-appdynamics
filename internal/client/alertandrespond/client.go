@@ -1,6 +1,6 @@
-// Package client is a minimal HTTP client for the Splunk AppDynamics Controller
+// Package alertandrespond is a minimal HTTP client for the Splunk AppDynamics Controller
 // "Alert and Respond" REST APIs (Health Rule, Policy, Actions, Schedule).
-package client
+package alertandrespond
 
 import (
 	"bytes"
