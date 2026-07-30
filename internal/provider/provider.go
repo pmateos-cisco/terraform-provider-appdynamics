@@ -138,5 +138,7 @@ func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasour
 		alertandrespond.NewPolicyDataSource,
 		alertandrespond.NewEventsDataSource,
 		alertandrespond.NewHealthRuleViolationsDataSource,
+		alertandrespond.NewSchedulesDataSource,
+		alertandrespond.NewScheduleDataSource,
 	}
 }

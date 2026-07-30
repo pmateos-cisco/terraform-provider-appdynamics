@@ -64,3 +64,22 @@ func (c *Client) UpdateSchedule(ctx context.Context, applicationID, scheduleID i
 func (c *Client) DeleteSchedule(ctx context.Context, applicationID, scheduleID int64) error {
 	return c.do(ctx, http.MethodDelete, schedulePath(applicationID, scheduleID), nil, nil)
 }
+
+// ScheduleSummary is the abbreviated representation returned by the
+// schedules list endpoint (id, name, description, timezone only -- no
+// scheduleConfiguration; use GetSchedule for a specific schedule's full
+// detail).
+type ScheduleSummary struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Timezone    string `json:"timezone"`
+}
+
+func (c *Client) ListSchedules(ctx context.Context, applicationID int64) ([]ScheduleSummary, error) {
+	var out []ScheduleSummary
+	if err := c.do(ctx, http.MethodGet, schedulesPath(applicationID), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

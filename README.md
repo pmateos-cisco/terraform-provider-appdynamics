@@ -69,6 +69,11 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
   events or health rule violations within a time range. Unlike this provider's other data sources,
   these are **reporting/lookup queries over historical data, not lists of current config** — the
   same query can return different results each time it's run as new events/violations occur.
+- `appdynamics_schedules` — lists schedules for an application (`id`, `name`, `description`,
+  `timezone` only — no `schedule_configuration`; use the singular data source below for that).
+- `appdynamics_schedule` — retrieves the full detail (including `schedule_configuration`) of one
+  schedule by `application_id` + `schedule_id`. Shares its type name with the managed resource,
+  same as `appdynamics_health_rule`.
 
 ## Known API documentation gaps
 
