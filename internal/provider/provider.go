@@ -122,6 +122,8 @@ func (p *appdynamicsProvider) Resources(ctx context.Context) []func() resource.R
 		alertandrespond.NewHealthRulesEnableAllResource,
 		alertandrespond.NewPolicyResource,
 		alertandrespond.NewActionSuppressionResource,
+		alertandrespond.NewCustomEventResource,
+		alertandrespond.NewDeploymentEventResource,
 	}
 }
 
@@ -134,5 +136,7 @@ func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasour
 		alertandrespond.NewActionSuppressionDataSource,
 		alertandrespond.NewPoliciesDataSource,
 		alertandrespond.NewPolicyDataSource,
+		alertandrespond.NewEventsDataSource,
+		alertandrespond.NewHealthRuleViolationsDataSource,
 	}
 }

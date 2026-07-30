@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -105,4 +106,39 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 		}
 	}
 	return nil
+}
+
+// doForm executes an authenticated request with a URL-encoded form body
+// against the legacy (non-v1) Controller REST API, returning the raw
+// response body. Used by the Events API, whose POST endpoints take form
+// parameters rather than a JSON body and return a plain-text response
+// rather than JSON.
+func (c *Client) doForm(ctx context.Context, method, path string, form url.Values) ([]byte, error) {
+	token, err := c.token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetching access token: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.controllerURL+path, strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("performing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(respBody)}
+	}
+	return respBody, nil
 }

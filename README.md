@@ -38,6 +38,12 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
   entities (a maintenance window). `suppression_schedule_type` is `ONE_TIME` (uses `start_time`/
   `end_time`) or `RECURRING` (uses `recurring_schedule_json`, same `scheduleFrequency` shapes as
   `appdynamics_schedule`'s `schedule_configuration`).
+- `appdynamics_deployment_event` / `appdynamics_custom_event` — create an `APPLICATION_DEPLOYMENT`
+  or `CUSTOM` event via the (legacy, non-`/alerting/rest/v1/`) Events API. **Create-only**: events
+  are immutable log entries with no "get by ID", update, or delete support in the underlying API,
+  so every attribute forces replacement on change, `Read` never contacts the API (nothing reliable
+  to read back), and `terraform destroy` only removes the resource from Terraform state — with a
+  warning — since the event itself can't be deleted from AppDynamics.
 
 ## Data Sources
 
@@ -59,6 +65,10 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
 - `appdynamics_policy` — retrieves the full detail (including `actions_json` / `events_json` /
   `selected_entities_json`) of one policy by `application_id` + `policy_id`. Shares its type name
   with the managed resource, same as `appdynamics_health_rule`.
+- `appdynamics_events` / `appdynamics_health_rule_violations` — query the (legacy) Events API for
+  events or health rule violations within a time range. Unlike this provider's other data sources,
+  these are **reporting/lookup queries over historical data, not lists of current config** — the
+  same query can return different results each time it's run as new events/violations occur.
 
 ## Known API documentation gaps
 
@@ -78,6 +88,21 @@ field name for the actual list of health rule names. Verified live: the real fie
 also isn't documented at all beyond the type name — verified live that it reuses the same
 `scheduleFrequency`-discriminated shape as `appdynamics_schedule`'s `schedule_configuration`
 (`scheduleFrequency: "WEEKLY"`, `days`, `startTime`, `endTime`, etc.).
+
+### Events API request/response format and indexing delay
+
+The Events API docs show an XML response and don't mention that `POST` takes URL-encoded form
+parameters (not JSON) or that its response is plain text (`"Successfully created the event
+id:1234"`) even when `output=JSON` is requested — that param only affects `GET` queries. Multiple
+`propertynames`/`propertyvalues` must be sent as **repeated** form parameters
+(`propertynames=a&propertynames=b`), not comma-joined (`propertynames=a,b` is treated as one
+literal property name containing a comma).
+
+Also verified live: there's a real indexing delay between creating an event and it becoming
+visible through the query endpoint — in testing, a freshly created event was briefly invisible to
+`appdynamics_events` (empty result) before showing up correctly on a later query. This isn't a bug
+in this provider; treat `appdynamics_events`/`appdynamics_health_rule_violations` results as
+eventually consistent, not immediate.
 
 ## Design note: JSON passthrough for nested config
 
