@@ -61,6 +61,20 @@ func IsNotFound(err error) bool {
 // path is relative to the controller URL. body, if non-nil, is marshaled as the
 // JSON request payload. out, if non-nil, receives the decoded JSON response body.
 func (c *Client) do(ctx context.Context, method, path string, body, out any) error {
+	return c.doWithContentType(ctx, method, path, "application/json", body, out)
+}
+
+// DoTyped is like do, but lets the caller specify the Content-Type/Accept
+// header value instead of the default application/json. Exported for reuse
+// by other API-family client packages (e.g. rbac) that share this
+// authenticated HTTP client but require a different content type -- the
+// RBAC API rejects plain application/json outright (verified live) and
+// requires a versioned type on every request.
+func (c *Client) DoTyped(ctx context.Context, method, path, contentType string, body, out any) error {
+	return c.doWithContentType(ctx, method, path, contentType, body, out)
+}
+
+func (c *Client) doWithContentType(ctx context.Context, method, path, contentType string, body, out any) error {
 	token, err := c.token(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching access token: %w", err)
@@ -80,9 +94,9 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 		return fmt.Errorf("building request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", contentType)
 	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", contentType)
 	}
 
 	resp, err := c.httpClient.Do(req)

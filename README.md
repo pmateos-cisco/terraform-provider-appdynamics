@@ -1,6 +1,7 @@
 # terraform-provider-appdynamics
 
-A Terraform provider for Splunk AppDynamics, covering the "Alert and Respond" Platform APIs.
+A Terraform provider for Splunk AppDynamics, covering the "Alert and Respond" Platform APIs and the
+RBAC (role-based access control) API.
 
 Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
 
@@ -13,6 +14,11 @@ Go source is grouped by AppDynamics API family under a subpackage named for that
   (schedules, actions, health rules, policies, action suppressions).
 - `internal/provider/alertandrespond/` — the Terraform resources/data sources backed by that
   client.
+- `internal/client/rbac/` / `internal/provider/rbac/` — sibling package for the RBAC
+  (role-based access control) API family: users, groups, roles, and the associations between them.
+  Reuses the `alertandrespond` package's OAuth-token-caching HTTP client via its exported `DoTyped`
+  method (RBAC requires a different, versioned `Content-Type`/`Accept` header) rather than
+  duplicating the client.
 - `internal/provider/provider.go` stays at the top level — it's the single `provider.Provider`
   implementation, and just registers every API family's resources/data sources into one provider.
 
@@ -49,6 +55,18 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
   `selected_entities_json`) plus `frequency` (hours, 1-168). Unlike `appdynamics_policy`, there is
   **no `execute_actions_in_batch`** — the API rejects that field as invalid for email digests
   (verified live), even though the official docs' own example payload includes it.
+- `appdynamics_user` — an RBAC user account. `name`/`display_name` are mutable in place; `password`
+  is write-only and forces replacement on change (the API has no password-update endpoint at all —
+  verified live, see below).
+- `appdynamics_group` — an RBAC group. `name`/`description` are mutable in place.
+- `appdynamics_role` — an RBAC role (name + `permissions_json`). `name` is mutable in place;
+  `permissions_json` forces replacement on change, since the API cannot update permissions on an
+  existing role (verified live, see below).
+- `appdynamics_group_membership` (`group_id`, `user_id`) / `appdynamics_role_user_assignment`
+  (`role_id`, `user_id`) / `appdynamics_role_group_assignment` (`role_id`, `group_id`) — dedicated
+  association resources modeling the many-to-many membership/assignment toggles, rather than list
+  attributes on the parent resource. Both ID fields force replacement on change; there's no partial
+  update for an association, only create/delete.
 
 ## Data Sources
 
@@ -85,6 +103,15 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
   / `selected_entities_json` / `frequency`) of one email digest by `application_id` +
   `email_digest_id`. Shares its type name with the managed resource, same as
   `appdynamics_health_rule`.
+- `appdynamics_users` / `appdynamics_groups` / `appdynamics_roles` — list all users/groups/roles in
+  the account (RBAC entities are account-wide, not scoped to an `application_id`, unlike every
+  Alert-and-Respond data source above).
+- `appdynamics_user` / `appdynamics_group` — retrieve full detail of one user/group, looked up by
+  **either** its numeric ID or `name` (exactly one must be set), same dual-lookup pattern as
+  `appdynamics_action_suppression`.
+- `appdynamics_role` — retrieves full detail (including `permissions_json`) of one role by
+  `role_id` only (no by-name lookup, since permissions require the ID-based
+  `include-permissions=true` GET).
 
 ## Known API documentation gaps
 
@@ -128,6 +155,40 @@ The docs show the list endpoint at `/controller/alerting/rest/v1/applications/<a
 create payload includes `"executeActionsInBatch": true`, but the API rejects it outright
 (`400: Execute actions in batch is not allowed for email digests`) — unlike `appdynamics_policy`,
 `appdynamics_email_digest` has no `execute_actions_in_batch` attribute at all.
+
+### RBAC API content type, not-found behavior, and immutable fields
+
+The RBAC API docs don't mention that both the `Content-Type` **and** `Accept` headers must be set
+to the versioned `application/vnd.appd.cntrl+json;v=1` — a plain `application/json` request gets
+`415 Unsupported Media Type`, and setting the versioned type on `Content-Type` alone (leaving
+`Accept` as JSON) gets `406 Not Acceptable`. Verified live.
+
+Also verified live: `GET` on a deleted/nonexistent user, group, or role returns a raw HTTP `500`
+with a Java NPE-style message (e.g. `Cannot invoke "...User.getId()" because "user" is null"`), not
+a `404`. `internal/client/rbac.IsNotFound` treats both the standard 404 and this 500-with-`"is
+null"` pattern as "not found" so `Read`/`Delete` behave correctly.
+
+Two fields are silently rejected on update, contradicting/omitting this from the docs:
+
+- `PUT /users/{id}` returns `400: 'password' should not specify` if the request body includes a
+  `password` field **at all**, even resending the same value unchanged — there is no
+  password-update endpoint in this API. `appdynamics_user`'s `password` attribute is write-only and
+  forces replacement on change.
+- `PUT /roles/{id}` returns `500: Users are not allowed to create/update permissions` if the
+  request body includes a `permissions` field at all. The docs do state elsewhere that role update
+  is limited to `name`/`description`, but don't mention that merely *including* the field (even
+  unchanged) triggers a hard error rather than being ignored. `appdynamics_role`'s
+  `permissions_json` attribute forces replacement on change.
+
+Also verified live: a user's `name` (unlike role permissions or password) genuinely is mutable via
+`PUT`, and both `id` and `security_provider_type` must be present in every `PUT /users/{id}` body
+even though the docs only mention `name`/`displayName` as updatable — omitting either gets
+`"id is not match"` or `"'security_provider_type' need to be internal"`.
+
+Group membership is reflected only on the **user's** detail response (`groups: [...]`), never on
+the group; role assignment is reflected on **both** the user's and the group's detail response
+(`roles: [...]`) depending on whether it's a user or group assignment. The three association
+resources' `Read` each query whichever entity actually reflects that specific relationship.
 
 ## Design note: JSON passthrough for nested config
 

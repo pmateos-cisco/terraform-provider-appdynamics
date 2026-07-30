@@ -15,6 +15,7 @@ import (
 
 	client "github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client/alertandrespond"
 	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/provider/alertandrespond"
+	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/provider/rbac"
 )
 
 // New returns a factory for the AppDynamics provider, suitable for passing to
@@ -125,6 +126,12 @@ func (p *appdynamicsProvider) Resources(ctx context.Context) []func() resource.R
 		alertandrespond.NewCustomEventResource,
 		alertandrespond.NewDeploymentEventResource,
 		alertandrespond.NewEmailDigestResource,
+		rbac.NewUserResource,
+		rbac.NewGroupResource,
+		rbac.NewRoleResource,
+		rbac.NewGroupMembershipResource,
+		rbac.NewRoleUserAssignmentResource,
+		rbac.NewRoleGroupAssignmentResource,
 	}
 }
 
@@ -143,5 +150,11 @@ func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasour
 		alertandrespond.NewScheduleDataSource,
 		alertandrespond.NewEmailDigestsDataSource,
 		alertandrespond.NewEmailDigestDataSource,
+		rbac.NewUsersDataSource,
+		rbac.NewUserDataSource,
+		rbac.NewGroupsDataSource,
+		rbac.NewGroupDataSource,
+		rbac.NewRolesDataSource,
+		rbac.NewRoleDataSource,
 	}
 }
