@@ -1,0 +1,1 @@
+terraform import appdynamics_synthetic_api_application.checkout_api 10499

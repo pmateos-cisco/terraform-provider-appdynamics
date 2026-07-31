@@ -1,7 +1,7 @@
 # terraform-provider-appdynamics
 
-A Terraform provider for Splunk AppDynamics, covering the "Alert and Respond" Platform APIs and the
-RBAC (role-based access control) API.
+A Terraform provider for Splunk AppDynamics, covering the "Alert and Respond" Platform APIs, the
+RBAC (role-based access control) API, and Synthetic Web Monitoring jobs.
 
 Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
 
@@ -19,6 +19,13 @@ Go source is grouped by AppDynamics API family under a subpackage named for that
   Reuses the `alertandrespond` package's OAuth-token-caching HTTP client via its exported `DoTyped`
   method (RBAC requires a different, versioned `Content-Type`/`Accept` header) rather than
   duplicating the client.
+- `internal/client/synthetics/` / `internal/provider/synthetics/` — sibling package for Synthetic
+  Web Monitoring jobs. Also reuses the `alertandrespond` client's `DoTyped` (standard
+  `application/json`, no special content type needed), but talks to a different base path: the
+  Controller's own internal `/controller/restui/synthetic/...` UI-backing API rather than the
+  officially documented Synthetic Monitoring API, which requires a separate EUM account
+  username/license key credential pair this provider doesn't use. See "Known API documentation
+  gaps" below.
 - `internal/provider/provider.go` stays at the top level — it's the single `provider.Provider`
   implementation, and just registers every API family's resources/data sources into one provider.
 
@@ -67,6 +74,20 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
   association resources modeling the many-to-many membership/assignment toggles, rather than list
   attributes on the parent resource. Both ID fields force replacement on change; there's no partial
   update for an association, only create/delete.
+- `appdynamics_synthetic_web_job` — a Synthetic Web Monitoring job (a scheduled browser check,
+  either a simple `url` page-load or a Selenium `script_json`; exactly one of the two must be set).
+  `application_id` and `app_key` (the EUM Browser App key) force replacement on change; every other
+  attribute, including `schedule_run_configs_json`, updates in place. Unlike
+  `appdynamics_custom_event`/`appdynamics_deployment_event`, this **is** a real, full CRUD resource
+  — a working (undocumented) delete endpoint was found and verified live, see below.
+- `appdynamics_synthetic_api_application` — a Synthetic API Monitoring application: the lightweight,
+  account-wide container `appdynamics_synthetic_api_job` resources are grouped under. Unlike Web
+  Monitoring's Browser RUM app requirement, this container has a full create/delete API lifecycle
+  (verified live). `name` forces replacement on change (no update endpoint was found).
+- `appdynamics_synthetic_api_job` — a Synthetic API Monitoring job (a scheduled scripted API check,
+  `api_metadata_json`). `application_id` forces replacement on change; every other attribute,
+  including `schedule_run_configs_json`, updates in place. No `app_key` attribute — verified live
+  that omitting it lets the server auto-assign the key tied to `application_id`.
 
 ## Data Sources
 
@@ -112,6 +133,21 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
 - `appdynamics_role` — retrieves full detail (including `permissions_json`) of one role by
   `role_id` only (no by-name lookup, since permissions require the ID-based
   `include-permissions=true` GET).
+- `appdynamics_synthetic_web_jobs` — lists Synthetic Web Monitoring jobs for a business application
+  (`id`, `description`, `url`, `user_enabled` only).
+- `appdynamics_synthetic_web_job` — retrieves the full detail (including
+  `schedule_run_configs_json` / `script_json` / `network_profile_json` / etc.) of one job by
+  `application_id` + `job_id`. Shares its type name with the managed resource, same as
+  `appdynamics_health_rule`.
+- `appdynamics_synthetic_api_applications` — lists all Synthetic API Monitoring applications in the
+  account (`id`, `name` only; account-wide, no inputs).
+- `appdynamics_synthetic_api_application` — retrieves the detail (including `app_key`) of one
+  application by ID. Shares its type name with the managed resource.
+- `appdynamics_synthetic_api_jobs` — lists Synthetic API Monitoring jobs for an application (`id`,
+  `description`, `user_enabled` only).
+- `appdynamics_synthetic_api_job` — retrieves the full detail (including
+  `schedule_run_configs_json` / `api_metadata_json` / etc.) of one job by `application_id` +
+  `job_id`. Shares its type name with the managed resource.
 
 ## Known API documentation gaps
 
@@ -189,6 +225,70 @@ Group membership is reflected only on the **user's** detail response (`groups: [
 the group; role assignment is reflected on **both** the user's and the group's detail response
 (`roles: [...]`) depending on whether it's a user or group assignment. The three association
 resources' `Read` each query whichever entity actually reflects that specific relationship.
+
+### Synthetic Monitoring API: no usable public endpoint, EUM app key discovery, and an undocumented delete
+
+The officially documented Synthetic Monitoring API (`<api_server_URL>/v1/synthetic/schedule`,
+Basic auth with an EUM account username + license key) is a separate credential pair this provider
+doesn't collect, so `appdynamics_synthetic_web_job` instead uses the Controller's own internal
+`/controller/restui/synthetic/schedule/<applicationId>/...` API — the same one the Controller UI
+itself calls — via OAuth with the existing client credentials. Verified live, but comes with its
+own set of undocumented behavior:
+
+- `application_id` in the URL path is **not** the Browser RUM app's own ID — there's no API to look
+  it up. It has to come from the Controller UI (User Experience > Browser Apps > *App Name*, visible
+  in the URL). Using the wrong ID, or an APM application ID, either 500s with a Java NPE (if that ID
+  has no EUM config at all) or fails create with `"Web Monitoring job can't be created under this
+  application"` (if it has EUM config but isn't the right Browser App).
+- `app_key` (the EUM Browser App key, e.g. `AD-AAB-ABJ-HRM`, also only visible in the Controller UI)
+  must match the Browser App tied to that `application_id`.
+- Create/update both return **`204 No Content` with no body** — contradicting the docs' documented
+  200-with-full-object response. Since there's also no single-item GET (`/getSchedule/{id}` 404s,
+  verified live), `appdynamics_synthetic_web_job`'s `Create` re-lists all jobs and matches on
+  `description`+`appKey` to find the new job's ID; `Read` always goes through the list endpoint and
+  filters client-side.
+- A newly created job defaults to **`userEnabled: false`** (disabled) unless explicitly set `true`
+  in the request — the docs' example response shows `userEnabled: true` with no mention that this
+  isn't the actual default.
+- `rate.value` must be 1-59 for a `MINUTES`-unit schedule (e.g. `60` is rejected with
+  `"rate.value must be between 1 & 59 for MINUTES"` — use `{value: 1, unit: "HOURS"}` instead).
+- A working delete endpoint exists — `POST .../deleteSchedules` with a JSON array of job IDs in the
+  body, returning `204` — despite not being listed anywhere in the docs' index of Synthetic
+  Monitoring API endpoints (which only lists create/update/get, no delete). This was found by
+  inspecting the Controller UI's own network calls, not by anything in the documentation.
+- Synthetic API Monitoring jobs (`appdynamics_synthetic_api_job`) are **not** grouped under a
+  Browser RUM app the way Web Monitoring jobs are, despite using the same `updateSchedule`/
+  `getSchedules`/`deleteSchedules` endpoint family under `.../synthetic/api-schedule/{applicationId}/
+  ...` instead of `.../synthetic/schedule/{applicationId}/...`. The initial attempt to create one
+  under a Browser RUM app's ID failed with `"API Monitoring job can't be created under this
+  application"` regardless of payload — the real requirement is a separate, dedicated container
+  entity of type `SYNTH_API_MONITORING`, created via `POST
+  /controller/restui/allApplications/createApplication?applicationType=SYNTH_API_MONITORING` with
+  body `{"name": "..."}` (found by inspecting the Controller UI's own network calls, not documented
+  anywhere). This container is modeled as `appdynamics_synthetic_api_application`:
+  - `createApplication`'s response doesn't include `appKey` (`applicationTypeInfo`/`eumAppName` are
+    null immediately after create) -- the full record, including `appKey`, is only available via
+    `GET /controller/restui/eumApplications/getEumApiMonitoringApplications`, an account-wide list
+    with no per-ID GET (verified live: several plausible single-item paths all 404).
+  - Deletion is `POST /controller/restui/allApplications/deleteApplication` with a **bare JSON
+    number** as the body (`10500`, not `[10500]` or `{"id":10500}` -- both rejected with a
+    deserialization error naming the expected type as `long`), returning `204`.
+  - No update endpoint was found (`POST .../updateApplication` 404s), so
+    `appdynamics_synthetic_api_application`'s `name` forces replacement on change.
+  - Once the application exists, `appdynamics_synthetic_api_job` creation needs **no `appKey` at
+    all** in the request body — verified live that omitting it lets the server auto-assign the key
+    tied to the target `applicationId`; the earlier failure was caused by pointing at the wrong kind
+    of application, not a missing/wrong key.
+  - **Caution**: during testing, calling `deleteSchedules` for the last remaining job under a
+    long-lived, pre-existing `SYNTH_API_MONITORING` application was followed by that application's
+    `getSchedules` endpoint permanently returning `500 InternalServerException` on both the
+    api-schedule and web-schedule paths, where it had been working normally moments before. The
+    application was separately removed via the Controller UI before root cause could be isolated, so
+    it's unconfirmed whether the delete call actually caused this or it was a coincidental
+    environment issue -- but a repeat of the same sequence (create app → create job → delete job)
+    against a disposable test application afterward completed cleanly with no such error. Treat
+    deleting the last job under a long-lived application with some caution until this is better
+    understood.
 
 ## Design note: JSON passthrough for nested config
 

@@ -1,0 +1,1 @@
+terraform import appdynamics_synthetic_api_job.health_check 10499/4af8bead-8ad9-4668-a073-4accf2f48079
