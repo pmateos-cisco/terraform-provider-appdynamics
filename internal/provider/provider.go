@@ -15,6 +15,7 @@ import (
 
 	client "github.com/pmateos-cisco/terraform-provider-appdynamics/internal/client/alertandrespond"
 	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/provider/alertandrespond"
+	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/provider/database"
 	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/provider/rbac"
 	"github.com/pmateos-cisco/terraform-provider-appdynamics/internal/provider/synthetics"
 )
@@ -136,6 +137,8 @@ func (p *appdynamicsProvider) Resources(ctx context.Context) []func() resource.R
 		synthetics.NewWebJobResource,
 		synthetics.NewAPIApplicationResource,
 		synthetics.NewAPIJobResource,
+		database.NewCollectorResource,
+		database.NewCollectorsBatchDeleteResource,
 	}
 }
 
@@ -166,5 +169,12 @@ func (p *appdynamicsProvider) DataSources(ctx context.Context) []func() datasour
 		synthetics.NewAPIApplicationDataSource,
 		synthetics.NewAPIJobsDataSource,
 		synthetics.NewAPIJobDataSource,
+		database.NewCollectorsDataSource,
+		database.NewCollectorDataSource,
+		database.NewServersDataSource,
+		database.NewServerDataSource,
+		database.NewNodesDataSource,
+		database.NewEventsDataSource,
+		database.NewHealthRuleViolationsDataSource,
 	}
 }

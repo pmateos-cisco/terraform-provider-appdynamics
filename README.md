@@ -1,7 +1,8 @@
 # terraform-provider-appdynamics
 
 A Terraform provider for Splunk AppDynamics, covering the "Alert and Respond" Platform APIs, the
-RBAC (role-based access control) API, and Synthetic Web Monitoring jobs.
+RBAC (role-based access control) API, Synthetic Monitoring (Web and API jobs), and the Database
+Visibility API.
 
 Targets AppDynamics SaaS controllers via OAuth2 client-credentials auth.
 
@@ -26,6 +27,9 @@ Go source is grouped by AppDynamics API family under a subpackage named for that
   officially documented Synthetic Monitoring API, which requires a separate EUM account
   username/license key credential pair this provider doesn't use. See "Known API documentation
   gaps" below.
+- `internal/client/database/` / `internal/provider/database/` — sibling package for the Database
+  Visibility API: collectors (full CRUD), plus read-only monitored servers, monitoring nodes,
+  agent events, and health rule violations. Also reuses the `alertandrespond` client's `DoTyped`.
 - `internal/provider/provider.go` stays at the top level — it's the single `provider.Provider`
   implementation, and just registers every API family's resources/data sources into one provider.
 
@@ -88,6 +92,17 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
   `api_metadata_json`). `application_id` forces replacement on change; every other attribute,
   including `schedule_run_configs_json`, updates in place. No `app_key` attribute — verified live
   that omitting it lets the server auto-assign the key tied to `application_id`.
+- `appdynamics_database_collector` — a Database Visibility collector (the config a Database Agent
+  uses to monitor a database server). Account-wide. `type` forces replacement on change (verified
+  live: the API rejects any update that changes it with `"Database Type cannot be modified!"`);
+  every other attribute, including `extra_config_json`, updates in place. `agent_name` must
+  reference an already-registered Database Agent — there is no API to create one. `password` is
+  write-only (the API always redacts it in responses).
+- `appdynamics_database_collectors_batch_delete` — permanently deletes a specific set of collectors
+  in one call via the batchDelete endpoint. Like `appdynamics_health_rules_enable_all`, this models
+  a one-shot bulk action rather than a persistent object, but since a batch delete can't be undone,
+  `terraform destroy` only drops it from state (with a warning) instead of reversing anything.
+  Prefer `appdynamics_database_collector` for normal one-at-a-time management.
 
 ## Data Sources
 
@@ -148,6 +163,22 @@ Terraform's own conventions — `examples/resources/<type>/`, `examples/data-sou
 - `appdynamics_synthetic_api_job` — retrieves the full detail (including
   `schedule_run_configs_json` / `api_metadata_json` / etc.) of one job by `application_id` +
   `job_id`. Shares its type name with the managed resource.
+- `appdynamics_database_collectors` — lists all Database Visibility collectors in the account
+  (`id`, `type`, `name`, `hostname`, `enabled` only; account-wide, no inputs).
+- `appdynamics_database_collector` — retrieves the full detail (including `extra_config_json`,
+  password excluded) of one collector by ID. Shares its type name with the managed resource.
+- `appdynamics_database_servers` — lists all monitored database servers discovered by collectors
+  (`id`, `name`, `type`, `host` only; account-wide, no inputs; read-only, no managed resource
+  exists since there's no create/update/delete API for these).
+- `appdynamics_database_server` — retrieves the detail of one monitored database server by ID.
+- `appdynamics_database_monitoring_nodes` — lists Database Agent instances in the account
+  (account-wide, no inputs; read-only).
+- `appdynamics_database_agent_events` — queries Database Monitoring agent events within a time
+  range. Like `appdynamics_events`, this is a reporting/lookup query over historical data, not a
+  list of current config — results change over time.
+- `appdynamics_database_health_rule_violations` — queries health rule violations for one monitored
+  database server within a time range. Like `appdynamics_health_rule_violations`, a reporting query
+  over historical data.
 
 ## Known API documentation gaps
 
@@ -289,6 +320,42 @@ own set of undocumented behavior:
     against a disposable test application afterward completed cleanly with no such error. Treat
     deleting the last job under a long-lived application with some caution until this is better
     understood.
+
+### Database Visibility API: full-object updates, output=JSON, and a required Agent Name
+
+The Database Visibility API is otherwise the most conventionally-documented, officially-supported
+REST API in this provider (standard `/controller/rest/databases/...` paths, standard OAuth, no
+undocumented `restui` endpoints needed) — but still had a few gaps:
+
+- The update endpoint (`POST /collectors/update`) rejects any request that omits existing fields
+  (verified live: a request with just `id`+`name` was rejected with a validation error) even though
+  the docs only list `id` as required — every field must be resent on every update.
+  `appdynamics_database_collector` handles this by round-tripping the full collector object through
+  `extra_config_json` (everything not modeled as its own attribute) rather than requiring the user
+  to reconstruct ~50 rarely-used fields on every apply.
+- `type` cannot be changed on an existing collector (verified live: `"Database Type cannot be
+  modified!"`), despite the docs not mentioning this restriction at all.
+- `agentName` must reference an already-registered Database Agent (verified live: unknown names are
+  rejected with `"Agent Name: ... does not exist in the database"`) — there is no API in this
+  family to create one, the same kind of pre-existing-dependency gap as Synthetic Web Monitoring's
+  Browser RUM app requirement.
+- The collector create endpoint returns `201` with **no response body** (contradicting the docs'
+  implied full-object response), so `appdynamics_database_collector`'s `Create` re-lists and
+  matches by name (enforced unique by the API) to find the new collector's ID.
+- "Not found" (GET on a deleted collector) surfaces as a `500` with a Java NPE message, not a `404`
+  — the same quirk as the RBAC API, handled the same way.
+- The nodes, agent events, and health-rule-violations endpoints (`/controller/rest/applications/
+  _dbmon/...` and `/controller/rest/databases/servers/healthrule-violations/...`) default to **XML**
+  regardless of the `Accept: application/json` header specified in the docs — `?output=JSON` must be
+  added explicitly, the same legacy-REST-API convention already documented for the Events API.
+- The agent events endpoint requires **both** `event-types` and `severities` query parameters
+  (verified live: omitting either is rejected with `"... is not specified"`), and `event-types`
+  rejects unrecognized values outright (e.g. `"ALL"` is not accepted) — there is no documented
+  enumeration of valid values; `POLICY_CONTINUES_CRITICAL` was confirmed valid via a real event
+  already present in the test account.
+- The undocumented `batchDelete` endpoint (`POST /collectors/batchDelete`) exists alongside the
+  documented per-ID `DELETE` and is fully functional — modeled as
+  `appdynamics_database_collectors_batch_delete`.
 
 ## Design note: JSON passthrough for nested config
 
